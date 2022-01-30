@@ -17,7 +17,7 @@ context('EndpointTest', () => {
 beforeEach(() => {
     //Using gui based login instead of session or other because I don't own the site and do not have time to design/investigate the wikipedia api.
     //uses login information stored in cypress.json
-    //should add checks if cookie sessions exist before trying
+    cy.clearCookies()
     cy.visit('https://en.wikipedia.org/w/index.php?title=Special:UserLogin')
         .get('#wpName1')
         .type(Cypress.env('userName'))
