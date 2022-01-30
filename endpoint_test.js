@@ -3,6 +3,7 @@
 //*  ALL WATCHLIST ITEMS WILL BE REMOVED! *
 
 //Requires env variables userName and userPassword to be defined in cypress.json.
+//cypress.json not included: Please use your own test account.
 //userName should be a wikipedia account login
 //userPassword should be the password to the wikipedia account
 
@@ -14,30 +15,45 @@
 //    Goes to the article in the watchlist and makes sure that the title matches
 //---------------------------------------------------------------------------------
 context('EndpointTest', () => {
-    const webroot = 'https://en.wikipedia.org'
+
+    //commonly used web elements
+    const webroot = 'https://en.wikipedia.org';
+    const editWatchlist = '/wiki/Special:EditWatchlist';
+    const uiInputWidget = '.oo-ui-inputWidget-input';
+    const uiInputWidgetLabel = '.oo-ui-inputWidget-input > .oo-ui-labelElement-label';
     
-    Cypress.Commands.add("clear_watchlist", (label) => {
-        cy.visit(webroot + '/wiki/Special:EditWatchlist/clear');
-        cy.get(label).click();
+    //wiki wishlist items to be manipulated by tests
+    const remainItem = 'Dog';
+    const removeItem = 'Cat';
+    
+    //repeating actions used in tests. 
+    //sacrificing repeat usability for readability by using const instead of parameters.
+    Cypress.Commands.add("clearWatchlist", () => {
+        cy.visit(webroot + editWatchlist + '/clear');
+        cy.get(uiInputWidgetLabel).click();
     })
     
-    Cypress.Commands.add("add_catdog_to_watchlist", (input) => {
-        cy.visit(webroot + '/wiki/Special:EditWatchlist/raw');
-        cy.get(input).first().type('cat\ndog');
-        cy.get( input + ' > .oo-ui-labelElement-label').click();
+    Cypress.Commands.add("addItemsToWatchlist", () => {
+        cy.visit(webroot + editWatchlist + '/raw');
+        cy.get(uiInputWidget).first().type(removeItem + '\n' + remainItem);
+        cy.get( uiInputWidgetLabel).click();
     })
     
-    Cypress.Commands.add("remove_cat_from_watchlist", (input) => {
-        cy.visit(webroot + '/wiki/Special:EditWatchlist');
-        cy.get(input).first().check();
-        cy.get(input).last().click();
+    Cypress.Commands.add("RemoveItemFromWatchlist", () => {
+        cy.visit(webroot + editWatchlist);
+        cy.get(uiInputWidget).first().check();
+        cy.get(uiInputWidget).last().click();
+    })
+    
+    Cypress.Commands.add("getReminingItemWidgetOnWatchlist", (item) => {
+        return cy.get("[href='/wiki/" + item + "']")
     })
     
     beforeEach(() => {
         //Using gui based login instead of session or other because I don't own the site and do not have time to design/investigate the wikipedia api.
         //uses login information stored in cypress.json
-        cy.clearCookies()
-        cy.visit('https://en.wikipedia.org/w/index.php?title=Special:UserLogin')
+        cy.clearCookies();
+        cy.visit(webroot + '/w/index.php?title=Special:UserLogin')
             .get('#wpName1')
             .type(Cypress.env('userName'))
             .get('#wpPassword1')
@@ -48,46 +64,46 @@ context('EndpointTest', () => {
     
     afterEach(() => {
         //logout for clean session
-        cy.visit('https://en.wikipedia.org/w/index.php?title=Special:UserLogout&returnto=Main+Page')
-            .get('.oo-ui-inputWidget-input > .oo-ui-labelElement-label')
+        cy.visit(webroot + '/w/index.php?title=Special:UserLogout&returnto=Main+Page')
+            .get(uiInputWidgetLabel)
             .click();
     })
     
-    it('Add two pages, cat and dog, to watchlist', () => {
-        cy.clear_watchlist('.oo-ui-inputWidget-input > .oo-ui-labelElement-label');
-        cy.add_catdog_to_watchlist('.oo-ui-inputWidget-input');
+    it('Add two pages to watchlist', () => {
+        cy.clearWatchlist();
+        cy.addItemsToWatchlist();
         
-        //Assert
-        cy.get('#mw-content-text').should('have.text', 'Your watchlist has been updated. 2 titles were added:\nCat (talk)\nDog (talk)\n\nReturn to Special:Watchlist.\n\nRetrieved from "https://en.wikipedia.org/wiki/Special:EditWatchlist/raw"');
+        //Assert: Check output result after adding items to watchlist
+        cy.get('#mw-content-text').should('have.text', 'Your watchlist has been updated. 2 titles were added:\n' + removeItem + ' (talk)\n'+ remainItem + ' (talk)\n\nReturn to Special:Watchlist.\n\nRetrieved from "https://en.wikipedia.org/wiki/Special:EditWatchlist/raw"');
     })
     
-    it('Remove cat item from watchlist', () => {
-        cy.clear_watchlist('.oo-ui-inputWidget-input > .oo-ui-labelElement-label');
-        cy.add_catdog_to_watchlist('.oo-ui-inputWidget-input');
-        cy.remove_cat_from_watchlist('.oo-ui-inputWidget-input');
+    it('Remove item from watchlist', () => {
+        cy.clearWatchlist();
+        cy.addItemsToWatchlist();
+        cy.RemoveItemFromWatchlist();
         
-        //Assert
-        cy.get('#mw-content-text').should('have.text', 'A single title was removed from your watchlist:\nCat (talk)\n\nReturn to Special:Watchlist.\n\nRetrieved from "https://en.wikipedia.org/wiki/Special:EditWatchlist"');
+        //Assert: Inspect label output for exact text match
+        cy.get('#mw-content-text').should('have.text', 'A single title was removed from your watchlist:\n' + removeItem + ' (talk)\n\nReturn to Special:Watchlist.\n\nRetrieved from "https://en.wikipedia.org/wiki/Special:EditWatchlist"');
     })
     
-    it('confirm dog item remains on watchlist', () => {
-        cy.clear_watchlist('.oo-ui-inputWidget-input > .oo-ui-labelElement-label');
-        cy.add_catdog_to_watchlist('.oo-ui-inputWidget-input');
-        cy.remove_cat_from_watchlist('.oo-ui-inputWidget-input');
+    it('confirm remaining item remains on watchlist', () => {
+        cy.clearWatchlist();
+        cy.addItemsToWatchlist();
+        cy.RemoveItemFromWatchlist();
     
-        //Assert
-        cy.visit('https://en.wikipedia.org/wiki/Special:EditWatchlist');
-        cy.get('.oo-ui-inputWidget-input').first().should('have.value', 'Dog');
+        //Assert: Inspect watchlist for remaining item
+        cy.visit(webroot + editWatchlist);
+        cy.getReminingItemWidgetOnWatchlist(remainItem).should('have.text', remainItem);
     })
     
-    it('remove cat and navigate to dog from watchlist', () => {
-        cy.clear_watchlist('.oo-ui-inputWidget-input > .oo-ui-labelElement-label');
-        cy.add_catdog_to_watchlist('.oo-ui-inputWidget-input');
-        cy.remove_cat_from_watchlist('.oo-ui-inputWidget-input');
+    it('remove cat and navigate to remaining item from watchlist', () => {
+        cy.clearWatchlist();
+        cy.addItemsToWatchlist();
+        cy.RemoveItemFromWatchlist();
     
-        //Assert
-        cy.visit('https://en.wikipedia.org/wiki/Special:EditWatchlist');
-        cy.get('[href="/wiki/Dog"]').click();
-        cy.get('.firstHeading').should('have.text', 'Dog');
+        //Assert: Inspect page title for match with remaining item
+        cy.visit(webroot + editWatchlist);
+        cy.getReminingItemWidgetOnWatchlist(remainItem).click();
+        cy.get('.firstHeading').should('have.text', remainItem);
     })
     })
